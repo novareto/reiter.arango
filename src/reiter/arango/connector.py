@@ -1,4 +1,5 @@
 import arango
+import orjson
 from typing import NamedTuple
 from reiter.arango.transaction import transaction
 from reiter.arango.binding import DBBinding
@@ -15,14 +16,14 @@ class Database(NamedTuple):
 
     database: arango.database.StandardDatabase
 
-    def query(self, model):
+    def bind(self, model):
         return DBBinding(model, self.database)
 
     def add(self, item):
         assert not item.bound
         try:
-            with transaction(self.session, self.collection) as txn:
-                collection = txn.collection(self.collection)
+            with transaction(self.database, item.__collection__) as txn:
+                collection = txn.collection(item.__collection__)
                 response = collection.insert(item.dict())
                 item.bind(
                     DBBinding(item.__class__, self.database),
@@ -36,8 +37,8 @@ class Database(NamedTuple):
 
     def replace(self, item):
         try:
-            with transaction(self.session, self.collection) as txn:
-                collection = txn.collection(self.collection)
+            with transaction(self.database, item.__collection__) as txn:
+                collection = txn.collection(item.__collection__)
                 data = item.dict()
                 response = collection.replace(data)
                 item.rev = response["_rev"]
@@ -70,27 +71,28 @@ class Connector:
         )
 
     @property
-    def system_database(self):
+    def _system(self):
         return self.client.db(
             '_system',
             username=self.config.user,
             password=self.config.password
         )
 
+    def delete_database(self):
+        sys = self._system
+        if not sys.has_database(self.config.database):
+            sys.delete_database(self.config.database)
+            return True
+        return False
+
     @property
     def database(self):
-        return self.client.db(
+        sys = self._system
+        if not sys.has_database(self.config.database):
+            sys.create_database(self.config.database)
+
+        return Database(database=self.client.db(
             self.config.database,
             username=self.config.user,
             password=self.config.password
-        )
-
-    def ensure_database(self):
-        sys_db = self.system_database
-        if not sys_db.has_database(self.config.database):
-            sys_db.create_database(self.config.database)
-
-    def delete_database(self):
-        sys_db = self.system_database
-        if not sys_db.has_database(self.config.database):
-            sys_db.delete_database(self.config.database)
+        ))

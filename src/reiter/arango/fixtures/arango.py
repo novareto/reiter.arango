@@ -1,4 +1,11 @@
+import arango
+import pytest
 from typing import NamedTuple
+
+
+READY_PHRASE = (
+    b"ArangoDB (version 3.7.3 [linux]) is ready for business. Have fun!\n"
+)
 
 
 class Config(NamedTuple):
@@ -9,7 +16,7 @@ class Config(NamedTuple):
 
 
 @pytest.fixture(scope="session")
-def arangodb(request):
+def arango_config(request):
     """Create a intermediary docker container a arangodb instance
     """
     import docker
@@ -25,13 +32,13 @@ def arangodb(request):
         user=arango_user,
         password=arango_password,
         database=arango_database,
-        url=arango_url,
-    ))
+        url="http://192.168.52.2:8529",
+    )
 
     container = client.containers.run(
         image="arangodb/arangodb:3.7.3",
         environment={
-            "ARANGO_ROOT_PASSWORD": config.arango.password
+            "ARANGO_ROOT_PASSWORD": config.password
         },
         detach=True
     )
@@ -66,7 +73,27 @@ def arangodb(request):
         container.remove()
 
     request.addfinalizer(cleanup)
-    return database
+    return config
+
+
+@pytest.fixture(scope="session")
+def arangodb(arango_config):
+
+    client = arango.ArangoClient(arango_config.url)
+    system_db = client.db(
+        '_system',
+        username=arango_config.user,
+        password=arango_config.password
+    )
+    if not system_db.has_database(arango_config.database):
+        system_db.create_database(arango_config.database)
+
+    yield client.db(
+        arango_config.database,
+        username=arango_config.user,
+        password=arango_config.password
+    )
+    system_db.delete_database(arango_config.database)
 
 
 def pytest_addoption(parser):

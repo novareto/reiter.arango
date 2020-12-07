@@ -5,8 +5,9 @@ from setuptools import setup, find_packages
 version = "0.1"
 
 install_requires = [
-    'pyarango',
+    'python-arango',
     'pydantic',
+    'orjson',
 ]
 
 test_requires = [
@@ -43,8 +44,8 @@ setup(
     },
     entry_points={
        'pytest11': [
-           'standard = fixtures',
-           'arangodb = fixtures.arangodb',
+           'standard = reiter.arango.fixtures',
+           'arangodb = reiter.arango.fixtures.arango',
        ],
     },
 )

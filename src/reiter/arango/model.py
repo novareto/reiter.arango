@@ -1,3 +1,7 @@
+from typing import Optional, ClassVar
+import pydantic
+
+
 class DBModel(pydantic.BaseModel):
 
     id: Optional[str] = pydantic.Field(alias="_id")
@@ -7,13 +11,13 @@ class DBModel(pydantic.BaseModel):
     __collection__: ClassVar[str]
     _binding = pydantic.PrivateAttr(default=None)
 
-    def bind(self, binding, id=..., key=..., rev=...):
+    def bind(self, binding, id=None, key=None, rev=None):
         assert not self.bound
-        if self.id != ...:
+        if id is not None:
             self.id = id
-        if self.key != ...:
+        if key is not None:
             self.key = key
-        if self.rev != ...:
+        if rev is not None:
             self.rev = rev
         self._binding = binding
 
@@ -25,8 +29,10 @@ class DBModel(pydantic.BaseModel):
 
     @property
     def bound(self):
-        return (self._binding is not None and
-                self.id and self.key and self.rev)
+        return (self._binding is not None
+                and self.id is not None
+                and self.key is not None
+                and self.rev is not None)
 
     @classmethod
     def spawn(cls, binding, **data):
@@ -47,6 +53,11 @@ class DBModel(pydantic.BaseModel):
         for key, value in data.items():
             setattr(self, key, value)
         self.rev = self._binding.update(self.key, **data)
+
+    def dict(self, by_alias=True, **kwargs):
+        if hasattr(self, '__key__'):
+            self.key = self.__key__
+        return super().dict(by_alias=by_alias, **kwargs)
 
 
 class arango_model:
