@@ -1,4 +1,5 @@
 import arango
+import pydantic
 import orjson
 from typing import NamedTuple
 from reiter.arango.transaction import transaction
@@ -17,7 +18,7 @@ class Database(NamedTuple):
     arango_db: arango.database.StandardDatabase
 
     def bind(self, model):
-        return DBBinding(model, self.arango_db)
+        return DBBinding(self, model)
 
     def add(self, item):
         assert not item.bound
@@ -26,7 +27,7 @@ class Database(NamedTuple):
                 collection = txn.collection(item.__collection__)
                 response = collection.insert(item.dict())
                 item.bind(
-                    DBBinding(item.__class__, self.arango_db),
+                    self.bind(item.__class__),
                     id=response["_id"],
                     key=response["_key"],
                     rev=response["_rev"]
@@ -40,12 +41,13 @@ class Database(NamedTuple):
             with transaction(self.arango_db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 data = item.dict()
+                if '_rev' in data:
+                    del data['_rev']
                 response = collection.replace(data)
                 item.rev = response["_rev"]
-                item.bind(
-                    DBBinding(item.__class__, self.arango_db),
-                    rev=response["_rev"]
-                )
+                if not item.bound:
+                    item.bind(self.bind(item.__class__))
+
         except arango.exceptions.DocumentUpdateError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
         return item

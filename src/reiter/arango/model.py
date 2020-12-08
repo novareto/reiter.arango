@@ -48,6 +48,9 @@ class DBModel(pydantic.BaseModel):
         self._binding.delete(self.key)
         self.unbind()
 
+    def save(self):
+        self._binding.db.replace(self)
+
     def update(self, **data) -> str:
         assert self.bound
         for key, value in data.items():
