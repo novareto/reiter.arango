@@ -22,6 +22,7 @@ def arango_config(request):
     import docker
     import time
 
+    arango = request.config.getoption("--arango")
     arango_url = request.config.getoption("--arango_url")
     arango_user = request.config.getoption("--arango_user")
     arango_password = request.config.getoption("--arango_password")
@@ -97,6 +98,11 @@ def arangodb(arango_config):
 
 
 def pytest_addoption(parser):
+
+    parser.addoption(
+        "--arango", action="store", default="docker",
+        help="arango: use a local instance of Arango or deploy a docker."
+    )
 
     parser.addoption(
         "--arango_user", action="store", default="root",

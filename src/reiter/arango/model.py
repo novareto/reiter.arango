@@ -59,6 +59,9 @@ class DBModel(pydantic.BaseModel):
             self.key = self.__key__
         return super().dict(by_alias=by_alias, **kwargs)
 
+    def json(self, by_alias=True, **kwargs):
+        return super().json(by_alias=by_alias, **kwargs)
+
 
 class arango_model:
 
@@ -68,6 +71,7 @@ class arango_model:
     def __call__(self, model_class):
         model = type(
             f"Arango{model_class.__name__}", (DBModel, model_class), {
-                "__collection__": self.collection
+                "__collection__": self.collection,
+                "__modelclass__": model_class
             })
         return model

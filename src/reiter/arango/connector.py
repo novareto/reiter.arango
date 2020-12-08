@@ -14,19 +14,19 @@ class Config(NamedTuple):
 
 class Database(NamedTuple):
 
-    database: arango.database.StandardDatabase
+    arango_db: arango.database.StandardDatabase
 
     def bind(self, model):
-        return DBBinding(model, self.database)
+        return DBBinding(model, self.arango_db)
 
     def add(self, item):
         assert not item.bound
         try:
-            with transaction(self.database, item.__collection__) as txn:
+            with transaction(self.arango_db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 response = collection.insert(item.dict())
                 item.bind(
-                    DBBinding(item.__class__, self.database),
+                    DBBinding(item.__class__, self.arango_db),
                     id=response["_id"],
                     key=response["_key"],
                     rev=response["_rev"]
@@ -37,13 +37,13 @@ class Database(NamedTuple):
 
     def replace(self, item):
         try:
-            with transaction(self.database, item.__collection__) as txn:
+            with transaction(self.arango_db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 data = item.dict()
                 response = collection.replace(data)
                 item.rev = response["_rev"]
                 item.bind(
-                    DBBinding(item.__class__, self.database),
+                    DBBinding(item.__class__, self.arango_db),
                     rev=response["_rev"]
                 )
         except arango.exceptions.DocumentUpdateError as exc:
@@ -85,13 +85,11 @@ class Connector:
             return True
         return False
 
-    @property
-    def database(self):
+    def get_database(self):
         sys = self._system
         if not sys.has_database(self.config.database):
             sys.create_database(self.config.database)
-
-        return Database(database=self.client.db(
+        return Database(arango_db=self.client.db(
             self.config.database,
             username=self.config.user,
             password=self.config.password
