@@ -22,11 +22,23 @@ def arango_config(request):
     import docker
     import time
 
-    arango = request.config.getoption("--arango")
+    local = request.config.getoption("--localdb")
     arango_url = request.config.getoption("--arango_url")
     arango_user = request.config.getoption("--arango_user")
     arango_password = request.config.getoption("--arango_password")
     arango_database = request.config.getoption("--arango_database")
+
+    if local:
+        return Config(
+            user=arango_user,
+            password=arango_password,
+            database=arango_database,
+            url=arango_url or "http://localhost:8529",
+        )
+
+    if arango_url is not None:
+        raise RuntimeError(
+            "You can't specify an arango url if running non-local tests.")
 
     client = docker.from_env()
     config = Config(
@@ -100,7 +112,7 @@ def arangodb(arango_config):
 def pytest_addoption(parser):
 
     parser.addoption(
-        "--arango", action="store", default="docker",
+        "--localdb", action="store_true",
         help="arango: use a local instance of Arango or deploy a docker."
     )
 
@@ -120,6 +132,6 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--arango_url", action="store", default="http://192.168.52.2:8529",
+        "--arango_url", action="store", default=None,
         help="arango_url: arango database url"
     )
