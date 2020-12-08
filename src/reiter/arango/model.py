@@ -1,14 +1,15 @@
+from abc import abstractmethod
 from typing import Optional, ClassVar
 import pydantic
+from reiter.arango.meta import Factory
 
 
-class DBModel(pydantic.BaseModel):
+class DBModel(Factory, pydantic.BaseModel):
 
     id: Optional[str] = pydantic.Field(alias="_id")
     key: Optional[str] = pydantic.Field(alias="_key")
     rev: Optional[str] = pydantic.Field(alias="_rev")
 
-    __collection__: ClassVar[str]
     _binding = pydantic.PrivateAttr(default=None)
 
     def bind(self, binding, id=None, key=None, rev=None):
@@ -64,6 +65,23 @@ class DBModel(pydantic.BaseModel):
 
     def json(self, by_alias=True, **kwargs):
         return super().json(by_alias=by_alias, **kwargs)
+
+
+class PluggableModel(Factory):
+
+    @abstractmethod
+    def lookup(self, **data) -> DBModel:
+        pass
+
+    @classmethod
+    def spawn(cls, binding, **data):
+        assert '_key' in data
+        assert '_id' in data
+        assert '_rev' in data
+        model_class = self.lookup(**data)
+        item = model_class(**data)
+        item.bind(binding)
+        return item
 
 
 class arango_model:

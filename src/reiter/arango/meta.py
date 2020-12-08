@@ -2,15 +2,11 @@ from abc import ABC, abstractmethod
 from typing import Iterable, Optional, ClassVar, Type
 
 
-class Model(abc.ABC):
+class Model(ABC):
 
     id: Optional[str]
     key: Optional[str]
     rev: Optional[str]
-
-    @abstractmethod
-    def spawn(self, **data):
-        pass
 
     @abstractmethod
     def delete(self, key) -> bool:
@@ -21,9 +17,18 @@ class Model(abc.ABC):
         pass
 
 
-class Binding(abc.ABC):
+class Factory(ABC):
 
-    model: Type[Model]
+    __collection__: ClassVar[str]
+
+    @abstractmethod
+    def spawn(self, **data) -> Model:
+        pass
+
+
+class Binding(ABC):
+
+    factory: Type[Factory]
 
     @abstractmethod
     def find(self, **filters) -> Iterable[Model]:
@@ -50,7 +55,7 @@ class Binding(abc.ABC):
         pass
 
 
-class Database(abc.ABC):
+class Database(ABC):
 
     @abstractmethod
     def query(self, model) -> Binding:
