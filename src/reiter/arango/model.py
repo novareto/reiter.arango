@@ -4,7 +4,14 @@ import pydantic
 from reiter.arango.meta import Factory
 
 
-class DBModel(Factory, pydantic.BaseModel):
+class ArangoModel(pydantic.BaseModel):
+
+    id: Optional[str] = pydantic.Field(alias="_id")
+    key: Optional[str] = pydantic.Field(alias="_key")
+    rev: Optional[str] = pydantic.Field(alias="_rev")
+
+
+class ArangoPydantic:
 
     id: Optional[str] = pydantic.Field(alias="_id")
     key: Optional[str] = pydantic.Field(alias="_key")

@@ -17,7 +17,7 @@ class Database(NamedTuple):
 
     arango_db: arango.database.StandardDatabase
 
-    def bind(self, model):
+    def __call__(self, model):
         return DBBinding(self, model)
 
     def add(self, item):
@@ -26,12 +26,6 @@ class Database(NamedTuple):
             with transaction(self.arango_db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 response = collection.insert(item.dict())
-                item.bind(
-                    self.bind(item.__class__),
-                    id=response["_id"],
-                    key=response["_key"],
-                    rev=response["_rev"]
-                )
         except arango.exceptions.DocumentInsertError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
         return item
@@ -45,9 +39,6 @@ class Database(NamedTuple):
                     del data['_rev']
                 response = collection.replace(data)
                 item.rev = response["_rev"]
-                if not item.bound:
-                    item.bind(self.bind(item.__class__))
-
         except arango.exceptions.DocumentUpdateError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
         return item
