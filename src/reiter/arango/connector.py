@@ -15,24 +15,23 @@ class Config(NamedTuple):
 
 class Database(NamedTuple):
 
-    arango_db: arango.database.StandardDatabase
+    db: arango.database.StandardDatabase
 
     def __call__(self, model):
-        return DBBinding(self, model)
+        return DBBinding(self.db, model)
 
     def add(self, item):
-        assert not item.bound
         try:
-            with transaction(self.arango_db, item.__collection__) as txn:
+            with transaction(self.db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 response = collection.insert(item.dict())
         except arango.exceptions.DocumentInsertError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
-        return item
+        return response
 
-    def replace(self, item):
+    def save(self, item):
         try:
-            with transaction(self.arango_db, item.__collection__) as txn:
+            with transaction(self.db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 data = item.dict()
                 if '_rev' in data:
@@ -41,7 +40,18 @@ class Database(NamedTuple):
                 item.rev = response["_rev"]
         except arango.exceptions.DocumentUpdateError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
-        return item
+        return response
+
+    def delete(self, item) -> bool:
+        binding = DBBinding(self.db, item.__class__)
+        return binding.delete(item.key)
+
+    def update(self, item, **data) -> str:
+        binding = DBBinding(self.db, item.__class__)
+        response = binding.update(item.key, **data)
+        for name, value in data.items():
+            setattr(item, name, value)
+        return response
 
 
 class Connector:
@@ -82,7 +92,7 @@ class Connector:
         sys = self._system
         if not sys.has_database(self.config.database):
             sys.create_database(self.config.database)
-        return Database(arango_db=self.client.db(
+        return Database(db=self.client.db(
             self.config.database,
             username=self.config.user,
             password=self.config.password

@@ -3,19 +3,11 @@ import typing
 import pydantic
 import hamcrest
 from reiter.arango.connector import Database
-from reiter.arango.model import ArangoModel
 
 
-class Document(ArangoModel):
-
-    __collection__ = 'docs'
-
+class Document(pydantic.BaseModel):
     name: str
     body: typing.Optional[str] = ""
-
-    @property
-    def __key__(self):
-        return self.name
 
 
 def test_API(arangodb):
@@ -27,9 +19,10 @@ def test_API(arangodb):
     assert doc is None
 
     doc = Document(name="test", body="My document")
-    database.add(doc)
+    response = database.add(doc)
+    doc_key = response['_key']
 
-    doc = database(Document).fetch('test')
+    doc = database(Document).fetch(doc_key)
     assert doc is not None
 
     response = database.update(doc, body='I changed the body')
