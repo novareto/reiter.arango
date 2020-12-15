@@ -18,37 +18,36 @@ def test_API(arangodb):
     doc = database(Document).fetch('test')
     assert doc is None
 
-    doc = Document(name="test", body="My document")
-    response = database.add(doc)
+    doc, response = database(Document).create(
+        name="test", body="My document")
     doc_key = response['_key']
 
     doc = database(Document).fetch(doc_key)
     assert doc is not None
 
-    response = database.update(doc, body='I changed the body')
-    assert doc.body == 'I changed the body'
+    response = database(Document).update(doc_key, body='I changed the body')
     hamcrest.assert_that(response, hamcrest.has_entries({
-        '_id': 'docs/test',
-        '_key': 'test',
+        '_id': f'document/{doc_key}',
+        '_key': doc_key,
         '_rev': hamcrest.instance_of(str),
         '_old_rev': hamcrest.instance_of(str)
     }))
 
-    doc = database(Document).fetch('test')
+    doc = database(Document).fetch(doc_key)
     assert doc.body == 'I changed the body'
 
     doc.body = 'I changed the body again'
-    response = database.save(doc)
+    response = database(Document).replace(doc_key, **doc.dict())
     hamcrest.assert_that(response, hamcrest.has_entries({
-        '_id': 'docs/test',
-        '_key': 'test',
+        '_id': f'document/{doc_key}',
+        '_key': doc_key,
         '_rev': hamcrest.instance_of(str),
         '_old_rev': hamcrest.instance_of(str)
     }))
 
-    doc = database(Document).fetch('test')
+    doc = database(Document).fetch(doc_key)
     assert doc.body == 'I changed the body again'
 
-    database.delete(doc)
-    doc = database(Document).fetch('test')
+    database(Document).delete(doc_key)
+    doc = database(Document).fetch(doc_key)
     assert doc is None

@@ -1,14 +1,15 @@
 import arango
 import pydantic
 import horseman.http
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Tuple
 from reiter.arango.transaction import transaction
 
 
-class DBBinding:
+class PydanticArango:
 
     db: arango.database.StandardDatabase
     model: Type[pydantic.BaseModel]
+    collection: str
 
     def __init__(self, db, model):
         self.db = db
@@ -42,6 +43,16 @@ class DBBinding:
         collection = self.db.collection(self.collection)
         return collection.has({"_key": key})
 
+    def create(self, **data) -> Tuple[pydantic.BaseModel, dict]:
+        item = self.model(**data)
+        try:
+            with transaction(self.db, self.collection) as txn:
+                collection = txn.collection(self.collection)
+                response = collection.insert(item.dict())
+                return item, response
+        except arango.exceptions.DocumentInsertError as exc:
+            raise horseman.http.HTTPError(exc.http_code, exc.message)
+
     def delete(self, key) -> bool:
         try:
             with transaction(self.db, self.collection) as txn:
@@ -56,6 +67,16 @@ class DBBinding:
                 collection = txn.collection(self.collection)
                 data = {'_key': key, **data}
                 response = collection.update(data)
+                return response
+        except arango.exceptions.DocumentUpdateError as exc:
+            raise horseman.http.HTTPError(exc.http_code, exc.message)
+
+    def replace(self, key, **data) -> str:
+        try:
+            with transaction(self.db, self.collection) as txn:
+                collection = txn.collection(self.collection)
+                data = {'_key': key, **data}
+                response = collection.replace(data)
                 return response
         except arango.exceptions.DocumentUpdateError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)

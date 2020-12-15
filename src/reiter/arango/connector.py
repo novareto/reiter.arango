@@ -3,7 +3,8 @@ import pydantic
 import orjson
 from typing import NamedTuple
 from reiter.arango.transaction import transaction
-from reiter.arango.binding import DBBinding
+from reiter.arango.binding import PydanticArango
+from reiter.arango.meta import Model
 
 
 class Config(NamedTuple):
@@ -13,14 +14,18 @@ class Config(NamedTuple):
     database: str
 
 
-class Database(NamedTuple):
+class Database:
 
-    db: arango.database.StandardDatabase
+    __slots__ = ('db',)
+
+    def __init__(self, db: arango.database.StandardDatabase):
+        self.db = db
 
     def __call__(self, model):
-        return DBBinding(self.db, model)
+        return PydanticArango(self.db, model)
 
-    def add(self, item):
+    def add(self, item: Model):
+        assert isinstance(item, Model)
         try:
             with transaction(self.db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
@@ -29,7 +34,8 @@ class Database(NamedTuple):
             raise horseman.http.HTTPError(exc.http_code, exc.message)
         return response
 
-    def save(self, item):
+    def save(self, item: Model):
+        assert isinstance(item, Model)
         try:
             with transaction(self.db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
@@ -42,12 +48,14 @@ class Database(NamedTuple):
             raise horseman.http.HTTPError(exc.http_code, exc.message)
         return response
 
-    def delete(self, item) -> bool:
-        binding = DBBinding(self.db, item.__class__)
+    def delete(self, item: Model) -> bool:
+        assert isinstance(item, Model)
+        binding = self(item.__class__)
         return binding.delete(item.key)
 
-    def update(self, item, **data) -> str:
-        binding = DBBinding(self.db, item.__class__)
+    def update(self, item: Model, **data) -> str:
+        assert isinstance(item, Model)
+        binding = self(item.__class__)
         response = binding.update(item.key, **data)
         for name, value in data.items():
             setattr(item, name, value)

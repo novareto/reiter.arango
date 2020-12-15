@@ -3,12 +3,12 @@ from typing import Iterable, Optional, ClassVar, Type
 
 
 class Model(ABC):
+    key: Optional[str]
     __collection__: ClassVar[str]
 
 
 class ModelMetadata(ABC):
     id: Optional[str]
-    key: Optional[str]
     rev: Optional[str]
 
 
