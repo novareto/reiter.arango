@@ -4,7 +4,7 @@ import orjson
 from typing import NamedTuple
 from reiter.arango.transaction import transaction
 from reiter.arango.binding import PydanticArango
-from reiter.arango.meta import Model
+from reiter.arango.meta import Model, ModelMetadata
 
 
 class Config(NamedTuple):
@@ -43,10 +43,11 @@ class Database:
                 if '_rev' in data:
                     del data['_rev']
                 response = collection.replace(data)
+            if isinstance(item, ModelMetadata):
                 item.rev = response["_rev"]
+            return response
         except arango.exceptions.DocumentUpdateError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
-        return response
 
     def delete(self, item: Model) -> bool:
         assert isinstance(item, Model)
@@ -57,6 +58,8 @@ class Database:
         assert isinstance(item, Model)
         binding = self(item.__class__)
         response = binding.update(item.key, **data)
+        if isinstance(item, ModelMetadata):
+            item.rev = response["_rev"]
         for name, value in data.items():
             setattr(item, name, value)
         return response
