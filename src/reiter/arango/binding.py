@@ -43,12 +43,16 @@ class PydanticArango:
         collection = self.db.collection(self.collection)
         return collection.has({"_key": key})
 
-    def create(self, **data) -> Tuple[pydantic.BaseModel, dict]:
+    def create(self, key=None, **data) -> Tuple[pydantic.BaseModel, dict]:
         item = self.model(**data)
         try:
             with transaction(self.db, self.collection) as txn:
                 collection = txn.collection(self.collection)
-                response = collection.insert(item.dict())
+                if key is not None:
+                    response = collection.insert(
+                        {'_key': key, **item.dict()})
+                else:
+                    response = collection.insert(item.dict())
                 return item, response
         except arango.exceptions.DocumentInsertError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
