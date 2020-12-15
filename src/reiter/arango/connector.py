@@ -1,10 +1,11 @@
 import arango
-import pydantic
+import horseman.http
 import orjson
+import pydantic
 from typing import NamedTuple
-from reiter.arango.transaction import transaction
 from reiter.arango.binding import PydanticArango
 from reiter.arango.meta import Model, ModelMetadata
+from reiter.arango.transaction import transaction
 
 
 class Config(NamedTuple):

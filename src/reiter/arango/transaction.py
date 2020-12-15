@@ -7,6 +7,6 @@ def transaction(db, collection):
     try:
         yield transaction
         transaction.commit_transaction()
-    except Exception as exc:
+    except Exception:
         transaction.abort_transaction()
         raise
