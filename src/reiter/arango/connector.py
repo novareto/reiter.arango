@@ -3,7 +3,8 @@ import pydantic
 import orjson
 from typing import NamedTuple
 from reiter.arango.transaction import transaction
-from reiter.arango.binding import DBBinding
+from reiter.arango.binding import PydanticArango
+from reiter.arango.meta import Model
 
 
 class Config(NamedTuple):
@@ -13,44 +14,52 @@ class Config(NamedTuple):
     database: str
 
 
-class Database(NamedTuple):
+class Database:
 
-    arango_db: arango.database.StandardDatabase
+    __slots__ = ('db',)
 
-    def bind(self, model):
-        return DBBinding(self, model)
+    def __init__(self, db: arango.database.StandardDatabase):
+        self.db = db
 
-    def add(self, item):
-        assert not item.bound
+    def __call__(self, model):
+        return PydanticArango(self.db, model)
+
+    def add(self, item: Model):
+        assert isinstance(item, Model)
         try:
-            with transaction(self.arango_db, item.__collection__) as txn:
+            with transaction(self.db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 response = collection.insert(item.dict())
-                item.bind(
-                    self.bind(item.__class__),
-                    id=response["_id"],
-                    key=response["_key"],
-                    rev=response["_rev"]
-                )
         except arango.exceptions.DocumentInsertError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
-        return item
+        return response
 
-    def replace(self, item):
+    def save(self, item: Model):
+        assert isinstance(item, Model)
         try:
-            with transaction(self.arango_db, item.__collection__) as txn:
+            with transaction(self.db, item.__collection__) as txn:
                 collection = txn.collection(item.__collection__)
                 data = item.dict()
                 if '_rev' in data:
                     del data['_rev']
                 response = collection.replace(data)
                 item.rev = response["_rev"]
-                if not item.bound:
-                    item.bind(self.bind(item.__class__))
-
         except arango.exceptions.DocumentUpdateError as exc:
             raise horseman.http.HTTPError(exc.http_code, exc.message)
-        return item
+        return response
+
+    def delete(self, item: Model) -> bool:
+        assert isinstance(item, Model)
+        binding = self(item.__class__)
+        return binding.delete(item.key)
+
+    def update(self, item: Model, **data) -> str:
+        assert isinstance(item, Model)
+        binding = self(item.__class__)
+        response = binding.update(item.key, **data)
+        for name, value in data.items():
+            setattr(item, name, value)
+        return response
 
 
 class Connector:
@@ -91,7 +100,7 @@ class Connector:
         sys = self._system
         if not sys.has_database(self.config.database):
             sys.create_database(self.config.database)
-        return Database(arango_db=self.client.db(
+        return Database(db=self.client.db(
             self.config.database,
             username=self.config.user,
             password=self.config.password

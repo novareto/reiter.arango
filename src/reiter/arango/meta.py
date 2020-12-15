@@ -3,32 +3,22 @@ from typing import Iterable, Optional, ClassVar, Type
 
 
 class Model(ABC):
-
-    id: Optional[str]
     key: Optional[str]
-    rev: Optional[str]
-
-    @abstractmethod
-    def delete(self, key) -> bool:
-        pass
-
-    @abstractmethod
-    def update(self, item) -> bool:
-        pass
-
-
-class Factory(ABC):
-
     __collection__: ClassVar[str]
 
-    @abstractmethod
-    def spawn(self, **data) -> Model:
-        pass
+
+class ModelMetadata(ABC):
+    id: Optional[str]
+    rev: Optional[str]
 
 
 class Binding(ABC):
 
-    factory: Type[Factory]
+    model: Type[Model]
+
+    @abstractmethod
+    def create_collection(self):
+        pass
 
     @abstractmethod
     def find(self, **filters) -> Iterable[Model]:
@@ -51,20 +41,28 @@ class Binding(ABC):
         pass
 
     @abstractmethod
-    def update(self, key, **data) -> str:
+    def update(self, key, **data) -> dict:
         pass
 
 
 class Database(ABC):
 
     @abstractmethod
-    def query(self, model) -> Binding:
+    def __call__(self, model: Type[Model]) -> Binding:
         pass
 
     @abstractmethod
-    def add(self, item) -> Model:
+    def add(self, item) -> dict:
         pass
 
     @abstractmethod
-    def replace(self, item) -> Model:
+    def update(self, item, **data) -> dict:
+        pass
+
+    @abstractmethod
+    def save(self, item) -> dict:
+        pass
+
+    @abstractmethod
+    def delete(self, item) -> None:
         pass
