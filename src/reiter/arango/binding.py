@@ -93,3 +93,7 @@ class PydanticArango:
 
     def create_collection(self):
         self.db.create_collection(self.collection)
+
+    @property
+    def collection_exists(self):
+        return self.db.has_collection(self.collection)
